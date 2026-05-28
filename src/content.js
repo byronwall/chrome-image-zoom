@@ -47,8 +47,13 @@
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
-      img[data-cim-hoverable="true"] { cursor: zoom-in !important; }
       body.cim-modal-open { overflow: hidden !important; }
+      img.cim-jump-flash,
+      video.cim-jump-flash {
+        outline: 4px solid #ffb020 !important;
+        outline-offset: 4px !important;
+        transition: outline-color 120ms ease, outline-offset 120ms ease !important;
+      }
     `;
     document.documentElement.append(style);
   }
@@ -65,6 +70,16 @@
     return normalizeUrl(img.currentSrc || img.src || img.getAttribute("src") || "");
   }
 
+  function getBestVideoSrc(video) {
+    const source = video.querySelector?.("source[src]")?.getAttribute("src") || "";
+    return normalizeUrl(video.currentSrc || video.src || video.getAttribute("src") || source);
+  }
+
+  function getBestMediaSrc(media) {
+    if (media?.tagName === "VIDEO") return getBestVideoSrc(media);
+    return getBestImageSrc(media);
+  }
+
   function sourcesMatch(left, right) {
     const normalizedLeft = normalizeUrl(left);
     const normalizedRight = normalizeUrl(right);
@@ -72,8 +87,9 @@
     return left === right;
   }
 
-  function getAltOrName(img, src, index) {
-    const alt = (img.getAttribute("alt") || img.getAttribute("aria-label") || "").trim();
+  function getAltOrName(media, src, index) {
+    const kind = media?.tagName === "VIDEO" ? "Video" : "Image";
+    const alt = (media.getAttribute("alt") || media.getAttribute("aria-label") || media.getAttribute("title") || "").trim();
     if (alt) return alt;
     try {
       const pathname = new URL(src).pathname;
@@ -82,35 +98,46 @@
     } catch {
       // Fall through to generic name.
     }
-    return `Image ${index + 1}`;
+    return `${kind} ${index + 1}`;
+  }
+
+  function mediaItemFromElement(media, src, index) {
+    const rect = media.getBoundingClientRect();
+    const isVideo = media.tagName === "VIDEO";
+    const naturalWidth = isVideo ? media.videoWidth || 0 : media.naturalWidth || 0;
+    const naturalHeight = isVideo ? media.videoHeight || 0 : media.naturalHeight || 0;
+
+    return {
+      kind: isVideo ? "video" : "image",
+      src,
+      poster: isVideo ? normalizeUrl(media.poster || media.getAttribute("poster") || "") : "",
+      title: getAltOrName(media, src, index),
+      alt: (media.getAttribute("alt") || media.getAttribute("aria-label") || "").trim(),
+      naturalWidth,
+      naturalHeight,
+      renderedWidth: Math.round(rect.width),
+      renderedHeight: Math.round(rect.height)
+    };
   }
 
   function collectImages(activeSrc) {
     const seen = new Set();
     const images = [];
 
-    for (const img of document.images) {
-      const src = getBestImageSrc(img);
+    for (const media of [...document.images, ...document.querySelectorAll("video")]) {
+      const src = getBestMediaSrc(media);
       if (!src || seen.has(src)) continue;
 
-      const rect = img.getBoundingClientRect();
-      const naturalWidth = img.naturalWidth || 0;
-      const naturalHeight = img.naturalHeight || 0;
+      const rect = media.getBoundingClientRect();
+      const naturalWidth = media.tagName === "VIDEO" ? media.videoWidth || 0 : media.naturalWidth || 0;
+      const naturalHeight = media.tagName === "VIDEO" ? media.videoHeight || 0 : media.naturalHeight || 0;
       const renderedArea = Math.max(0, rect.width) * Math.max(0, rect.height);
       const naturalArea = naturalWidth * naturalHeight;
 
       if (src !== activeSrc && renderedArea < 100 && naturalArea < 10000) continue;
 
       seen.add(src);
-      images.push({
-        src,
-        title: getAltOrName(img, src, images.length),
-        alt: (img.getAttribute("alt") || "").trim(),
-        naturalWidth,
-        naturalHeight,
-        renderedWidth: Math.round(rect.width),
-        renderedHeight: Math.round(rect.height)
-      });
+      images.push(mediaItemFromElement(media, src, images.length));
     }
 
     const activeIndex = Math.max(0, images.findIndex((item) => item.src === activeSrc));
@@ -126,20 +153,22 @@
     let best = null;
     let bestScore = 0;
 
-    for (const img of document.images) {
-      const src = getBestImageSrc(img);
+    for (const media of [...document.images, ...document.querySelectorAll("video")]) {
+      const src = getBestMediaSrc(media);
       if (!src) continue;
 
-      const rect = img.getBoundingClientRect();
+      const rect = media.getBoundingClientRect();
       const renderedArea = Math.max(0, rect.width) * Math.max(0, rect.height);
-      const naturalArea = (img.naturalWidth || 0) * (img.naturalHeight || 0);
+      const width = media.tagName === "VIDEO" ? media.videoWidth || 0 : media.naturalWidth || 0;
+      const height = media.tagName === "VIDEO" ? media.videoHeight || 0 : media.naturalHeight || 0;
+      const naturalArea = width * height;
       const visibleWidth = Math.max(0, Math.min(rect.right, innerWidth) - Math.max(rect.left, 0));
       const visibleHeight = Math.max(0, Math.min(rect.bottom, innerHeight) - Math.max(rect.top, 0));
       const visibleArea = visibleWidth * visibleHeight;
       const score = visibleArea * 3 + renderedArea + naturalArea * 0.05;
 
       if (score > bestScore) {
-        best = img;
+        best = media;
         bestScore = score;
       }
     }
@@ -163,17 +192,22 @@
 
   function getMimeType(item) {
     const src = item.src.split("?")[0].split("#")[0].toLowerCase();
+    if (src.endsWith(".mp4")) return "video/mp4";
+    if (src.endsWith(".webm")) return "video/webm";
+    if (src.endsWith(".mov")) return "video/quicktime";
+    if (src.endsWith(".m4v")) return "video/x-m4v";
+    if (src.endsWith(".ogv") || src.endsWith(".ogg")) return "video/ogg";
     if (src.endsWith(".jpg") || src.endsWith(".jpeg")) return "image/jpeg";
     if (src.endsWith(".png")) return "image/png";
     if (src.endsWith(".gif")) return "image/gif";
     if (src.endsWith(".webp")) return "image/webp";
     if (src.endsWith(".svg")) return "image/svg+xml";
     if (src.startsWith("data:")) return src.slice(5, src.indexOf(";")) || "image";
-    return "image";
+    return item.kind === "video" ? "video" : "image";
   }
 
   function getFileName(item) {
-    let base = item.title || "image";
+    let base = item.title || item.kind || "image";
     try {
       const url = new URL(item.src);
       const leaf = decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() || "");
@@ -259,6 +293,15 @@
     const item = activeItem();
     if (!item) return;
     const requestId = ++preloadRequestId;
+    if (item.kind === "video") {
+      imageNaturalSize = {
+        width: item.naturalWidth || item.renderedWidth || 1,
+        height: item.naturalHeight || item.renderedHeight || 1
+      };
+      resetView();
+      renderMetadata();
+      return;
+    }
     const img = new Image();
     img.decoding = "async";
     img.onload = () => {
@@ -318,6 +361,8 @@
     const header = document.createElement("header");
     header.className = "cim-header";
 
+    const gridButton = button("Grid", "cim-button cim-grid-toggle", toggleGridView, "Show image grid");
+
     const titleBlock = document.createElement("div");
     titleBlock.className = "cim-title-block";
     const title = document.createElement("h2");
@@ -332,13 +377,13 @@
     const body = document.createElement("div");
     body.className = "cim-body";
 
-    header.append(titleBlock, actions);
+    header.append(gridButton, titleBlock, actions);
     dialog.append(header, body);
     root.append(dialog);
     document.documentElement.append(root);
     document.body.classList.add("cim-modal-open");
 
-    refs = { root, dialog, header, title, meta, actions, body };
+    refs = { root, dialog, header, gridButton, title, meta, actions, body };
     renderModalContent();
     preloadActiveImage();
 
@@ -364,6 +409,7 @@
 
   function renderActions() {
     refs.actions.textContent = "";
+    const item = activeItem();
     const saveControl = document.createElement("div");
     saveControl.className = "cim-save-control";
 
@@ -381,17 +427,18 @@
     const saveButton = button("Save", "cim-button", () => saveActiveImage(folderSelect.value), "Save image to folder");
     saveControl.append(folderSelect, saveButton);
 
+    if (item?.kind !== "video") refs.actions.append(saveControl);
     refs.actions.append(
-      saveControl,
       button("Bulk Save", "cim-button", openBulkSavePane, "Bulk save page images"),
-      button("Copy", "cim-button", copyActiveImage, "Copy image"),
-      button("Download", "cim-button", downloadActiveImage, "Download image"),
+      ...(item?.kind === "video" ? [] : [button("Copy", "cim-button", copyActiveImage, "Copy image")]),
+      button("Download", "cim-button", downloadActiveImage, item?.kind === "video" ? "Download video" : "Download image"),
+      button("Jump", "cim-button", jumpToActiveImage, "Jump to media"),
       button("Zoom Out", "cim-button", () => zoomAt(ZOOM_OUT_FACTOR), "Zoom out"),
       button("Reset", "cim-button", resetView, "Reset zoom"),
       button("Zoom In", "cim-button", () => zoomAt(ZOOM_IN_FACTOR), "Zoom in"),
       button("Close", "cim-button cim-close-button", closeModal, "Close")
     );
-    refreshFolders(folderSelect);
+    if (item?.kind !== "video") refreshFolders(folderSelect);
   }
 
   function renderFolderOptions(select) {
@@ -438,31 +485,20 @@
     renderMetadata();
     renderActions();
     refs.body.textContent = "";
+    refs.activeThumb = null;
+    refs.rail = null;
+    refs.gridOverlay = null;
 
     if (state.items.length > 1) {
       const rail = document.createElement("aside");
       rail.className = "cim-rail";
       state.items.forEach((thumb, index) => {
-        const thumbButton = document.createElement("button");
-        thumbButton.type = "button";
-        thumbButton.className = "cim-thumb";
-        thumbButton.setAttribute("aria-label", `Open ${thumb.title || `image ${index + 1}`}`);
-        if (index === state.index) thumbButton.setAttribute("aria-current", "true");
+        const thumbButton = renderImageThumb(thumb, index, "cim-thumb");
         thumbButton.addEventListener("click", () => setActiveIndex(index));
-
-        const img = document.createElement("img");
-        img.src = thumb.src;
-        img.alt = thumb.alt || thumb.title || "";
-        img.loading = "lazy";
-        img.draggable = false;
-
-        const number = document.createElement("span");
-        number.className = "cim-thumb-number";
-        number.textContent = String(index + 1);
-
-        thumbButton.append(img, number);
+        if (index === state.index) refs.activeThumb = thumbButton;
         rail.append(thumbButton);
       });
+      refs.rail = rail;
       refs.body.append(rail);
     }
 
@@ -479,20 +515,8 @@
     stage.addEventListener("pointerup", handlePointerUp);
     stage.addEventListener("pointercancel", handlePointerUp);
 
-    const img = document.createElement("img");
-    img.className = "cim-main-image";
-    img.src = item.src;
-    img.alt = item.alt || item.title || "Selected image";
-    img.draggable = false;
-    img.addEventListener("load", () => {
-      imageNaturalSize = {
-        width: img.naturalWidth || item.naturalWidth || 1,
-        height: img.naturalHeight || item.naturalHeight || 1
-      };
-      resetView();
-      renderMetadata();
-    });
-    stage.append(img);
+    const media = renderMainMedia(item);
+    stage.append(media);
 
     if (state.items.length > 1) {
       stageWrap.append(
@@ -504,7 +528,7 @@
     stageWrap.append(stage);
     refs.body.append(stageWrap);
     refs.stage = stage;
-    refs.image = img;
+    refs.image = media;
 
     if (resizeObserver) resizeObserver.disconnect();
     resizeObserver = new ResizeObserver(([entry]) => {
@@ -514,6 +538,155 @@
     });
     resizeObserver.observe(stage);
     renderViewport();
+    scrollActiveThumbIntoView();
+    renderGridView();
+  }
+
+  function renderMainMedia(item) {
+    if (item.kind === "video") {
+      const video = document.createElement("video");
+      video.className = "cim-main-image cim-main-media";
+      video.src = item.src;
+      if (item.poster) video.poster = item.poster;
+      video.controls = true;
+      video.autoplay = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+      video.draggable = false;
+      video.addEventListener("loadedmetadata", () => {
+        imageNaturalSize = {
+          width: video.videoWidth || item.naturalWidth || item.renderedWidth || 1,
+          height: video.videoHeight || item.naturalHeight || item.renderedHeight || 1
+        };
+        video.width = imageNaturalSize.width;
+        video.height = imageNaturalSize.height;
+        resetView();
+        renderMetadata();
+      });
+      if (item.naturalWidth || item.renderedWidth) video.width = item.naturalWidth || item.renderedWidth;
+      if (item.naturalHeight || item.renderedHeight) video.height = item.naturalHeight || item.renderedHeight;
+      video.addEventListener("error", () => {
+        renderMetadata(item.poster ? "Video stream unavailable" : "Video failed to load");
+      });
+      return video;
+    }
+
+    const img = document.createElement("img");
+    img.className = "cim-main-image cim-main-media";
+    img.src = item.src;
+    img.alt = item.alt || item.title || "Selected image";
+    img.draggable = false;
+    img.addEventListener("load", () => {
+      imageNaturalSize = {
+        width: img.naturalWidth || item.naturalWidth || 1,
+        height: img.naturalHeight || item.naturalHeight || 1
+      };
+      resetView();
+      renderMetadata();
+    });
+    return img;
+  }
+
+  function renderImageThumb(item, index, className) {
+    const thumbButton = document.createElement("button");
+    thumbButton.type = "button";
+    thumbButton.className = className;
+    thumbButton.setAttribute("aria-label", `Open ${item.title || `image ${index + 1}`}`);
+    if (index === state.index) thumbButton.setAttribute("aria-current", "true");
+
+    const img = renderThumbMedia(item);
+
+    const number = document.createElement("span");
+    number.className = "cim-thumb-number";
+    number.textContent = String(index + 1);
+
+    thumbButton.append(img, number);
+    return thumbButton;
+  }
+
+  function renderThumbMedia(item) {
+    if (item.kind === "video" && !item.poster) {
+      const video = document.createElement("video");
+      video.src = item.src;
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+      video.draggable = false;
+      return video;
+    }
+
+    const img = document.createElement("img");
+    img.src = item.kind === "video" ? item.poster : item.src;
+    img.alt = item.alt || item.title || "";
+    img.loading = "lazy";
+    img.draggable = false;
+    return img;
+  }
+
+  function scrollActiveThumbIntoView() {
+    if (!refs.activeThumb) return;
+    requestAnimationFrame(() => {
+      refs.activeThumb?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+  }
+
+  function toggleGridView() {
+    if (!state || state.items.length < 2) return;
+    state.gridOpen = !state.gridOpen;
+    renderGridView();
+  }
+
+  function closeGridView() {
+    if (!state?.gridOpen) return;
+    state.gridOpen = false;
+    refs.gridOverlay?.remove();
+    refs.gridOverlay = null;
+    if (refs.gridButton) {
+      refs.gridButton.setAttribute("aria-pressed", "false");
+      refs.gridButton.title = "Show image grid";
+      refs.gridButton.setAttribute("aria-label", "Show image grid");
+    }
+  }
+
+  function renderGridView() {
+    refs.gridOverlay?.remove();
+    refs.gridOverlay = null;
+
+    const isOpen = Boolean(state?.gridOpen && state.items.length > 1);
+    if (refs.gridButton) {
+      refs.gridButton.hidden = state?.items.length < 2;
+      refs.gridButton.setAttribute("aria-pressed", String(isOpen));
+      refs.gridButton.title = isOpen ? "Hide image grid" : "Show image grid";
+      refs.gridButton.setAttribute("aria-label", refs.gridButton.title);
+    }
+    if (!isOpen || !refs.body) return;
+
+    const overlay = document.createElement("div");
+    overlay.className = "cim-grid-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-label", "Image grid");
+
+    const grid = document.createElement("div");
+    grid.className = "cim-grid-panel";
+    state.items.forEach((item, index) => {
+      const tile = renderImageThumb(item, index, "cim-grid-tile");
+      tile.addEventListener("click", () => {
+        state.gridOpen = false;
+        setActiveIndex(index);
+      });
+      grid.append(tile);
+      if (index === state.index) {
+        requestAnimationFrame(() => tile.scrollIntoView({ block: "nearest", inline: "nearest" }));
+      }
+    });
+
+    overlay.append(grid);
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) closeGridView();
+    });
+    refs.body.append(overlay);
+    refs.gridOverlay = overlay;
   }
 
   function handleWheel(event) {
@@ -524,6 +697,7 @@
 
   function handlePointerDown(event) {
     if (event.button !== 0) return;
+    if (isVideoControlPointer(event)) return;
     refs.stage.setPointerCapture(event.pointerId);
     panSession = {
       pointerId: event.pointerId,
@@ -531,6 +705,15 @@
       lastY: event.clientY
     };
     refs.stage.classList.add("cim-panning");
+  }
+
+  function isVideoControlPointer(event) {
+    const video = event.target?.closest?.("video");
+    if (!video || video !== refs.image) return false;
+
+    const rect = video.getBoundingClientRect();
+    const controlHeight = Math.min(56, Math.max(36, rect.height * 0.22));
+    return event.clientY >= rect.bottom - controlHeight;
   }
 
   function handlePointerMove(event) {
@@ -559,7 +742,17 @@
     if (!state) return;
     if (event.key === "Escape") {
       event.preventDefault();
-      closeModal();
+      if (state.gridOpen) {
+        closeGridView();
+      } else {
+        closeModal();
+      }
+    } else if (event.key.toLowerCase() === "j") {
+      event.preventDefault();
+      jumpToActiveImage();
+    } else if (event.key.toLowerCase() === "g") {
+      event.preventDefault();
+      toggleGridView();
     } else if (event.key === "ArrowLeft" && state.items.length > 1) {
       event.preventDefault();
       setActiveIndex(state.index - 1);
@@ -677,7 +870,12 @@
   }
 
   function openBulkSavePane() {
-    const items = state?.items?.length ? state.items : collectImages(activeItem()?.src || "").images;
+    const items = (state?.items?.length ? state.items : collectImages(activeItem()?.src || "").images)
+      .filter((item) => item.kind !== "video");
+    if (!items.length) {
+      showToast("No images available for bulk save", true);
+      return;
+    }
     const selected = new Set(items.map((item) => item.src));
 
     const overlay = document.createElement("div");
@@ -950,21 +1148,24 @@
   }
 
   function openModalForImage(img) {
-    const activeSrc = getBestImageSrc(img);
-    console.info(LOG_PREFIX, "open image element request", {
+    const activeSrc = getBestMediaSrc(img);
+    console.info(LOG_PREFIX, "open media element request", {
       activeSrc,
       alt: img.getAttribute("alt"),
-      naturalWidth: img.naturalWidth,
-      naturalHeight: img.naturalHeight
+      tagName: img.tagName,
+      naturalWidth: img.naturalWidth || img.videoWidth,
+      naturalHeight: img.naturalHeight || img.videoHeight
     });
     if (!activeSrc) {
-      console.warn(LOG_PREFIX, "image element had no usable src", img);
+      console.warn(LOG_PREFIX, "media element had no usable src", img);
       return;
     }
     const { images, activeIndex } = collectImages(activeSrc);
     state = {
       items: images.length ? images : [{
+        kind: img.tagName === "VIDEO" ? "video" : "image",
         src: activeSrc,
+        poster: img.tagName === "VIDEO" ? normalizeUrl(img.poster || img.getAttribute("poster") || "") : "",
         title: getAltOrName(img, activeSrc, 0),
         alt: img.alt || ""
       }],
@@ -981,7 +1182,8 @@
       return false;
     }
 
-    const matchingImage = Array.from(document.images).find((img) => sourcesMatch(getBestImageSrc(img), activeSrc));
+    const matchingImage = [...document.images, ...document.querySelectorAll("video")]
+      .find((img) => sourcesMatch(getBestMediaSrc(img), activeSrc));
     if (matchingImage) {
       openModalForImage(matchingImage);
       return true;
@@ -990,7 +1192,9 @@
     const { images } = collectImages(activeSrc);
     state = {
       items: [{
+        kind: "image",
         src: activeSrc,
+        poster: "",
         title: getAltOrName({ getAttribute: () => "", alt: "" }, activeSrc, 0),
         alt: ""
       }, ...images.filter((item) => !sourcesMatch(item.src, activeSrc))],
@@ -998,6 +1202,27 @@
     };
     renderModalShell();
     return true;
+  }
+
+  function findPageImageForItem(item) {
+    if (!item?.src) return null;
+    return [...document.images, ...document.querySelectorAll("video")]
+      .find((img) => sourcesMatch(getBestMediaSrc(img), item.src)) || null;
+  }
+
+  function jumpToActiveImage() {
+    const img = findPageImageForItem(activeItem());
+    if (!img) {
+      showToast("Image is not visible on this page", true);
+      return;
+    }
+
+    closeModal();
+    requestAnimationFrame(() => {
+      img.scrollIntoView({ block: "center", inline: "center", behavior: "auto" });
+      img.classList.add("cim-jump-flash");
+      setTimeout(() => img.classList.remove("cim-jump-flash"), 550);
+    });
   }
 
   function closeModal() {
@@ -1021,17 +1246,66 @@
   }
 
   function markHoverableImages() {
-    for (const img of document.images) {
-      img.dataset.cimHoverable = "true";
+    // Intentionally empty. Kept as the MutationObserver target so older injected
+    // script instances do not need a different setup path.
+  }
+
+  function usableImage(img) {
+    if (!img || (img.tagName !== "IMG" && img.tagName !== "VIDEO")) return null;
+    return getBestMediaSrc(img) ? img : null;
+  }
+
+  function imageFromElement(element) {
+    if (!element || element.nodeType !== Node.ELEMENT_NODE) return null;
+
+    const direct = usableImage(element.closest?.("img, video"));
+    if (direct) return direct;
+
+    const child = usableImage(element.querySelector?.("img, video"));
+    if (child) return child;
+
+    const linkedImage = usableImage(element.closest?.("a")?.querySelector?.("img, video"));
+    if (linkedImage) return linkedImage;
+
+    return null;
+  }
+
+  function imageFromPoint(x, y) {
+    const elements = document.elementsFromPoint?.(x, y) || [];
+    for (const element of elements) {
+      const img = imageFromElement(element);
+      if (img) return img;
     }
+
+    for (const img of [...document.images, ...document.querySelectorAll("video")]) {
+      if (!usableImage(img)) continue;
+      const rect = img.getBoundingClientRect();
+      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+        return img;
+      }
+    }
+
+    return null;
+  }
+
+  function findAltActivatedImage(event) {
+    const path = event.composedPath?.() || [];
+    for (const node of path) {
+      const img = imageFromElement(node);
+      if (img) return img;
+    }
+
+    return imageFromPoint(event.clientX, event.clientY);
   }
 
   function handleAltImageActivation(event, trigger) {
     if (!event.altKey) return false;
-    const img = event.target?.closest?.("img");
+    const img = findAltActivatedImage(event);
     console.info(LOG_PREFIX, `Alt-${trigger} observed`, {
       targetTag: event.target?.tagName,
       hasImageTarget: Boolean(img),
+      resolvedTag: img?.tagName,
+      resolvedSrc: img ? getBestMediaSrc(img) : "",
       button: event.button,
       defaultPrevented: event.defaultPrevented,
       x: event.clientX,
