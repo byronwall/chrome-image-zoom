@@ -1,0 +1,412 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 760px;
+  height: 560px;
+  margin: 0;
+  overflow: hidden;
+  background: #f7f9f7;
+  color: #202422;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 1px solid #8fc19e;
+  border-radius: 5px;
+  background: #fff;
+  color: #2f7d4b;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+button:hover {
+  background: #eef8f1;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #cdd4ce;
+  background: #fff;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+#status {
+  margin-top: 2px;
+  color: #64706a;
+  font-size: 12px;
+}
+
+.shortcut-note {
+  margin-top: 2px;
+  color: #64706a;
+  font-size: 11px;
+}
+
+#refresh {
+  height: 30px;
+  padding: 0 10px;
+}
+
+.folder-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #dfe5e0;
+  background: #fff;
+}
+
+.folder-form input {
+  min-width: 0;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid #c7d1ca;
+  border-radius: 5px;
+}
+
+.folder-form button {
+  height: 30px;
+  padding: 0 10px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 176px minmax(0, 1fr);
+  height: calc(100% - 105px);
+  min-height: 0;
+}
+
+.folders {
+  overflow: auto;
+  padding: 8px;
+  border-right: 1px solid #cdd4ce;
+  background: #fff;
+}
+
+.folder-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.folder {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 8px;
+  border-color: transparent;
+  color: #2a342e;
+  text-align: left;
+}
+
+.folder-delete {
+  width: 50px;
+  min-height: 32px;
+  border-color: #d4aaaa;
+  color: #9a3535;
+  font-size: 11px;
+}
+
+.folder-delete:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.folder[aria-current="true"] {
+  border-color: #6c8d77;
+  background: #eef6f0;
+}
+
+.folder span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-count {
+  color: #68746d;
+  font-size: 12px;
+}
+
+.content {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #dfe5e0;
+  background: #fff;
+}
+
+.content-header h2 {
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#folder-count {
+  color: #64706a;
+  font-size: 12px;
+}
+
+.images {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  align-content: start;
+  gap: 8px;
+  padding: 10px;
+}
+
+.empty {
+  grid-column: 1 / -1;
+  margin: 24px auto;
+  color: #66716b;
+  font-size: 13px;
+}
+
+.image-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #d3dad5;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.image-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  display: block;
+  object-fit: cover;
+  background: #eef2ee;
+}
+
+.image-meta {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+}
+
+.image-title {
+  overflow: hidden;
+  color: #202422;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-source {
+  overflow: hidden;
+  color: #64706a;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.image-actions button,
+.image-actions a {
+  min-width: 0;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #c8d3cc;
+  border-radius: 5px;
+  color: #2f7d4b;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.delete {
+  color: #9a3535;
+  border-color: #d4aaaa;
+}
+
+.viewer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  background: rgba(45, 55, 49, 0.26);
+}
+
+.viewer-shell {
+  width: calc(100vw - 8px);
+  height: calc(100vh - 8px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid #b7c1b8;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.viewer-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid #cdd4ce;
+}
+
+.viewer-title {
+  min-width: 0;
+}
+
+.viewer-title h3 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 16px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viewer-meta {
+  margin-top: 2px;
+  color: #64706a;
+  font-size: 12px;
+}
+
+.viewer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.viewer-button {
+  height: 30px;
+  padding: 0 9px;
+  font-size: 13px;
+}
+
+.viewer-body {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  min-height: 0;
+}
+
+.viewer-rail {
+  min-height: 0;
+  overflow: auto;
+  padding: 6px;
+  border-right: 1px solid #cdd4ce;
+}
+
+.viewer-thumb {
+  width: 100%;
+  aspect-ratio: 1;
+  display: block;
+  margin-bottom: 6px;
+  padding: 0;
+  overflow: hidden;
+  border-color: #d4d8d4;
+  border-radius: 5px;
+}
+
+.viewer-thumb[aria-current="true"] {
+  border-color: #2f7d4b;
+  box-shadow: inset 0 0 0 2px #2f7d4b;
+}
+
+.viewer-thumb img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.viewer-stage-wrap {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: linear-gradient(90deg, #e8eee9 0 48px, #ffffff 48px calc(100% - 48px), #e8eee9 calc(100% - 48px));
+}
+
+.viewer-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.viewer-stage.panning {
+  cursor: grabbing;
+}
+
+.viewer-image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  max-width: none;
+  max-height: none;
+  transform-origin: center center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viewer-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 68px;
+  height: 34px;
+  transform: translateY(-50%);
+  font-size: 12px;
+}
+
+.viewer-prev {
+  left: 6px;
+}
+
+.viewer-next {
+  right: 6px;
+}

@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Alt Image Zoom Modal",
+  "description": "Alt-click any page image to open a zoomable modal with page image carousel navigation.",
+  "version": "0.1.0",
+  "permissions": ["clipboardWrite", "contextMenus", "downloads", "storage", "unlimitedStorage"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_title": "Image folders",
+    "default_popup": "src/popup.html"
+  },
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content.js"],
+      "css": ["src/modal.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/modal.css"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

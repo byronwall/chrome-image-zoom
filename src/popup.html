@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Image Folders</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>Image Folders</h1>
+        <p id="status">Loading</p>
+        <p class="shortcut-note">Shortcut: Cmd+Shift+P opens the image zoom modal on the current page.</p>
+      </div>
+      <button id="refresh" type="button" title="Refresh">Refresh</button>
+    </header>
+
+    <form id="folder-form" class="folder-form">
+      <input id="folder-name" autocomplete="off" placeholder="New folder" aria-label="New folder name">
+      <button type="submit">Create</button>
+    </form>
+
+    <main class="layout">
+      <aside id="folders" class="folders" aria-label="Folders"></aside>
+      <section class="content">
+        <div class="content-header">
+          <h2 id="folder-title">Folder</h2>
+          <span id="folder-count"></span>
+        </div>
+        <div id="images" class="images"></div>
+      </section>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

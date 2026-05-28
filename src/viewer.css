@@ -1,0 +1,173 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #ffffff;
+  color: #202422;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button {
+  border: 1px solid #8fc19e;
+  border-radius: 5px;
+  background: #fff;
+  color: #2f7d4b;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+button:hover {
+  background: #eef8f1;
+}
+
+.viewer-shell {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  background: #fff;
+}
+
+.viewer-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 48px;
+  padding: 7px 10px 7px 14px;
+  border-bottom: 1px solid #cdd4ce;
+}
+
+.viewer-title {
+  min-width: 0;
+}
+
+.viewer-title h1 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 19px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viewer-meta {
+  margin-top: 2px;
+  color: #64706a;
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.viewer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.viewer-button {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 14px;
+}
+
+.viewer-body {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+}
+
+.viewer-rail {
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+  border-right: 1px solid #cdd4ce;
+  background: #fff;
+}
+
+.viewer-thumb {
+  width: 100%;
+  aspect-ratio: 1;
+  display: block;
+  margin-bottom: 8px;
+  padding: 0;
+  overflow: hidden;
+  border-color: #d4d8d4;
+  border-radius: 6px;
+}
+
+.viewer-thumb[aria-current="true"] {
+  border-color: #2f7d4b;
+  box-shadow: inset 0 0 0 2px #2f7d4b;
+}
+
+.viewer-thumb img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.viewer-stage-wrap {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: #ffffff;
+}
+
+.viewer-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.viewer-stage.panning {
+  cursor: grabbing;
+}
+
+.viewer-image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  max-width: none;
+  max-height: none;
+  transform-origin: center center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viewer-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 78px;
+  height: 38px;
+  transform: translateY(-50%);
+  font-size: 13px;
+}
+
+.viewer-prev {
+  left: 10px;
+}
+
+.viewer-next {
+  right: 10px;
+}
+
+.empty {
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  color: #64706a;
+  font-size: 15px;
+}
