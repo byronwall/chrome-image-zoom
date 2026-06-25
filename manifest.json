@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "Alt Image Zoom Modal",
-  "description": "Alt-click any page image to open a zoomable modal with page image carousel navigation.",
-  "version": "0.1.0",
+  "name": "Alt Zoom — Image & Table Viewer",
+  "description": "Alt-click any image to open a zoomable modal, or any table / CSS grid to open a sortable, filterable table viewer with CSV/TSV/HTML copy.",
+  "version": "0.2.0",
   "permissions": ["clipboardWrite", "contextMenus", "downloads", "storage", "unlimitedStorage"],
   "host_permissions": ["<all_urls>"],
   "action": {
-    "default_title": "Image folders",
+    "default_title": "Alt Zoom — image folders & test page",
     "default_popup": "src/popup.html"
   },
   "background": {
@@ -15,14 +15,14 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["src/content.js"],
-      "css": ["src/modal.css"],
+      "js": ["src/table.js", "src/content.js"],
+      "css": ["src/modal.css", "src/table.css"],
       "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/modal.css"],
+      "resources": ["src/modal.css", "src/table.css"],
       "matches": ["<all_urls>"]
     }
   ]

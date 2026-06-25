@@ -740,33 +740,42 @@
 
   function handleKeydown(event) {
     if (!state) return;
-    if (event.key === "Escape") {
+
+    // Keys this modal acts on are consumed entirely (capture phase) so they
+    // never propagate back to the underlying page/app.
+    const consume = () => {
       event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    };
+
+    if (event.key === "Escape") {
+      consume();
       if (state.gridOpen) {
         closeGridView();
       } else {
         closeModal();
       }
     } else if (event.key.toLowerCase() === "j") {
-      event.preventDefault();
+      consume();
       jumpToActiveImage();
     } else if (event.key.toLowerCase() === "g") {
-      event.preventDefault();
+      consume();
       toggleGridView();
     } else if (event.key === "ArrowLeft" && state.items.length > 1) {
-      event.preventDefault();
+      consume();
       setActiveIndex(state.index - 1);
     } else if (event.key === "ArrowRight" && state.items.length > 1) {
-      event.preventDefault();
+      consume();
       setActiveIndex(state.index + 1);
     } else if (event.key === "+" || event.key === "=") {
-      event.preventDefault();
+      consume();
       zoomAt(ZOOM_IN_FACTOR);
     } else if (event.key === "-") {
-      event.preventDefault();
+      consume();
       zoomAt(ZOOM_OUT_FACTOR);
     } else if (event.key === "0") {
-      event.preventDefault();
+      consume();
       resetView();
     }
   }
@@ -1300,6 +1309,8 @@
 
   function handleAltImageActivation(event, trigger) {
     if (!event.altKey) return false;
+    // Ignore clicks inside either modal overlay (ours or the table viewer).
+    if (event.target?.closest?.("#cim-root, #ctm-root")) return false;
     const img = findAltActivatedImage(event);
     console.info(LOG_PREFIX, `Alt-${trigger} observed`, {
       targetTag: event.target?.tagName,

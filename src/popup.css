@@ -63,9 +63,25 @@ h1 {
   font-size: 11px;
 }
 
-#refresh {
+.header-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+#refresh,
+#create-test-page {
   height: 30px;
   padding: 0 10px;
+}
+
+#create-test-page {
+  border-color: #6c8cff;
+  color: #2236b0;
+}
+
+#create-test-page:hover {
+  background: #eef1ff;
 }
 
 .folder-form {

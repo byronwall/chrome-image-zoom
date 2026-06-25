@@ -14,6 +14,7 @@ const folderCountEl = document.getElementById("folder-count");
 const folderForm = document.getElementById("folder-form");
 const folderNameInput = document.getElementById("folder-name");
 const refreshButton = document.getElementById("refresh");
+const createTestPageButton = document.getElementById("create-test-page");
 
 folderForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -31,6 +32,17 @@ folderForm.addEventListener("submit", async (event) => {
 });
 
 refreshButton.addEventListener("click", () => loadLibrary());
+
+createTestPageButton.addEventListener("click", async () => {
+  setStatus("Opening test page");
+  const response = await chrome.runtime.sendMessage({ type: "CIM_OPEN_TEST_PAGE" });
+  if (!response?.ok) {
+    setStatus(response?.error || "Unable to open test page");
+    return;
+  }
+  setStatus("Test page opened");
+  window.close();
+});
 
 loadLibrary();
 

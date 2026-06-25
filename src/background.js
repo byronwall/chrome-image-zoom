@@ -157,6 +157,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "CIM_OPEN_TEST_PAGE") {
+    openTestPage()
+      .then(sendResponse)
+      .catch((error) => sendResponse({ ok: false, error: error.message || String(error) }));
+    return true;
+  }
+
   if (message?.type === "CIM_DELETE_STORED_IMAGE") {
     deleteStoredImage(message.imageId)
       .then(sendResponse)
@@ -456,6 +463,14 @@ async function downloadImage(url, filename) {
     conflictAction: "uniquify"
   });
   return { ok: true, downloadId };
+}
+
+async function openTestPage() {
+  // The test page is one of our own extension pages; it loads the modal
+  // scripts (content.js / table.js) itself, so nothing needs to be injected.
+  const url = chrome.runtime.getURL("src/test-page.html");
+  const tab = await chrome.tabs.create({ url });
+  return { ok: true, tabId: tab.id };
 }
 
 function filenameFromUrl(url) {
