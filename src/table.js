@@ -4,11 +4,17 @@
   const LOG_PREFIX = "[alt-table-zoom]";
 
   if (window.__chromeTableModalInstalled) {
-    console.info(LOG_PREFIX, "table content script already installed", location.href);
+    console.info(
+      LOG_PREFIX,
+      "table content script already installed",
+      location.href,
+    );
     return;
   }
   window.__chromeTableModalInstalled = true;
-  console.info(LOG_PREFIX, "table content script loaded", { url: location.href });
+  console.info(LOG_PREFIX, "table content script loaded", {
+    url: location.href,
+  });
 
   // ---------------------------------------------------------------------------
   // State
@@ -30,7 +36,35 @@
   window.__chromeTableModalDebug = {
     version: "0.1.0",
     loadedAt: new Date().toISOString(),
-    getState: () => ({ hasModal: Boolean(document.getElementById(ROOT_ID)), raw, model, viewState })
+    getState: () => ({
+      hasModal: Boolean(document.getElementById(ROOT_ID)),
+      raw,
+      model,
+      viewState,
+    }),
+    inspectElement: (el) => {
+      const found = findTableLike(el);
+      if (!found) return null;
+      const extracted = extract(found);
+      return {
+        kind: found.kind,
+        tag: found.el.tagName,
+        rows: extracted.matrix.length,
+        columns: extracted.matrix.reduce(
+          (max, row) => Math.max(max, row.length),
+          0,
+        ),
+        gridVerdict:
+          found.kind === "grid"
+            ? gridLooksTabular(extracted.matrix)
+            : { ok: true },
+        matrix: extracted.matrix.map((row) => row.map((cell) => cell.text)),
+      };
+    },
+    openElement: (el, force = false) => {
+      const found = findTableLike(el);
+      return found ? openForElement(found, force) : false;
+    },
   };
 
   // ---------------------------------------------------------------------------
@@ -63,9 +97,19 @@
     if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
     const display = getComputedStyle(el).display;
     if (display !== "grid" && display !== "inline-grid") return false;
-    // Must have at least a couple of laid-out children to be worth treating as a table.
+    // Must have at least a couple of laid-out children and visible column tracks
+    // to be worth treating as a table instead of a generic layout container.
     const kids = [...el.children].filter((c) => c.getClientRects().length);
-    return kids.length >= 2;
+    return kids.length >= 2 && gridColumnCount(el) >= 2;
+  }
+
+  function gridColumnCount(el) {
+    const columns = getComputedStyle(el).gridTemplateColumns;
+    if (!columns || columns === "none") return 0;
+    return columns
+      .split(/\s+/)
+      .map((part) => part.trim())
+      .filter(Boolean).length;
   }
 
   function findTableLike(startEl) {
@@ -96,12 +140,61 @@
   // Extraction helpers
   // ---------------------------------------------------------------------------
   function cellText(el) {
-    const text = (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim();
-    return text;
+    const parts = [];
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) =>
+        isTextHidden(node.parentElement, el)
+          ? NodeFilter.FILTER_REJECT
+          : NodeFilter.FILTER_ACCEPT,
+    });
+    while (walker.nextNode()) parts.push(walker.currentNode.nodeValue || "");
+    return parts.join(" ").replace(/\s+/g, " ").trim();
+  }
+
+  function isTextHidden(el, boundary) {
+    let current = el;
+    while (current && current !== boundary.parentElement) {
+      if (current.nodeType !== Node.ELEMENT_NODE) return false;
+      const ariaHidden =
+        current.getAttribute?.("aria-hidden") || current.ariaHidden;
+      if (ariaHidden === "true" || current.hidden) return true;
+      if (
+        ["SCRIPT", "STYLE", "SVG", "NOSCRIPT", "TEMPLATE"].includes(
+          current.tagName,
+        )
+      )
+        return true;
+      current = current.parentElement;
+    }
+    return false;
+  }
+
+  function hasSubstantiveMedia(el) {
+    return [
+      ...el.querySelectorAll("img, svg, video, canvas, picture, iframe"),
+    ].some((media) => !isDecorativeOrHiddenMedia(media, el));
+  }
+
+  function isDecorativeOrHiddenMedia(el, boundary) {
+    let current = el;
+    while (current && current !== boundary.parentElement) {
+      if (current.nodeType !== Node.ELEMENT_NODE) return false;
+      const ariaHidden =
+        current.getAttribute?.("aria-hidden") || current.ariaHidden;
+      if (ariaHidden === "true" || current.hidden) return true;
+      if (["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"].includes(current.tagName))
+        return true;
+      current = current.parentElement;
+    }
+    return false;
   }
 
   function makeCell(el) {
-    return { text: cellText(el), html: el.innerHTML };
+    return {
+      text: cellText(el),
+      html: el.innerHTML,
+      hasSubstantiveMedia: hasSubstantiveMedia(el),
+    };
   }
 
   // Real <table> -> matrix with colspan/rowspan expansion.
@@ -121,9 +214,10 @@
         for (let dr = 0; dr < rowspan; dr += 1) {
           for (let dc = 0; dc < colspan; dc += 1) {
             matrix[r + dr] = matrix[r + dr] || [];
-            matrix[r + dr][c + dc] = dr === 0 && dc === 0
-              ? { ...data, isHeader }
-              : { text: "", html: "", isHeader, spanned: true };
+            matrix[r + dr][c + dc] =
+              dr === 0 && dc === 0
+                ? { ...data, isHeader }
+                : { text: "", html: "", isHeader, spanned: true };
           }
         }
         c += colspan;
@@ -131,7 +225,8 @@
     }
     const width = matrix.reduce((max, row) => Math.max(max, row.length), 0);
     for (const row of matrix) {
-      for (let i = 0; i < width; i += 1) if (!row[i]) row[i] = { text: "", html: "" };
+      for (let i = 0; i < width; i += 1)
+        if (!row[i]) row[i] = { text: "", html: "" };
     }
 
     // Header rows: prefer <thead>, else count leading all-<th> rows.
@@ -140,11 +235,16 @@
       headerRowCount = table.tHead.rows.length;
     } else {
       for (const row of matrix) {
-        if (row.length && row.every((cell) => cell.isHeader || cell.spanned)) headerRowCount += 1;
+        if (row.length && row.every((cell) => cell.isHeader || cell.spanned))
+          headerRowCount += 1;
         else break;
       }
     }
-    return { matrix, headerRowCount: headerRowCount > 0 ? 1 : 0, sourceType: "table" };
+    return {
+      matrix,
+      headerRowCount: headerRowCount > 0 ? 1 : 0,
+      sourceType: "table",
+    };
   }
 
   // Group arbitrary elements into rows by their vertical position.
@@ -168,14 +268,17 @@
       }
       current.push(item);
     }
-    return rows.map((row) => row.sort((a, b) => a.left - b.left).map((it) => it.el));
+    return rows.map((row) =>
+      row.sort((a, b) => a.left - b.left).map((it) => it.el),
+    );
   }
 
   function matrixFromRowElements(rowEls) {
     const matrix = rowEls.map((cells) => cells.map((el) => makeCell(el)));
     const width = matrix.reduce((max, row) => Math.max(max, row.length), 0);
     for (const row of matrix) {
-      for (let i = 0; i < width; i += 1) if (!row[i]) row[i] = { text: "", html: "" };
+      for (let i = 0; i < width; i += 1)
+        if (!row[i]) row[i] = { text: "", html: "" };
     }
     return matrix;
   }
@@ -184,9 +287,11 @@
     const rowEls = [...root.querySelectorAll('[role="row"]')];
     let rows;
     if (rowEls.length) {
-      rows = rowEls.map((rowEl) =>
-        [...rowEl.querySelectorAll('[role="columnheader"], [role="rowheader"], [role="cell"], [role="gridcell"]')]
-      );
+      rows = rowEls.map((rowEl) => [
+        ...rowEl.querySelectorAll(
+          '[role="columnheader"], [role="rowheader"], [role="cell"], [role="gridcell"]',
+        ),
+      ]);
     } else {
       rows = rowsByPosition([...root.children]);
     }
@@ -194,11 +299,25 @@
     const firstHasHeader = rowEls.length
       ? rowEls[0].querySelector('[role="columnheader"]') != null
       : true;
-    return { matrix, headerRowCount: firstHasHeader ? 1 : 0, sourceType: "aria" };
+    return {
+      matrix,
+      headerRowCount: firstHasHeader ? 1 : 0,
+      sourceType: "aria",
+    };
   }
 
   function extractGrid(root) {
-    const rows = rowsByPosition([...root.children]);
+    const cells = [...root.children].filter((el) => el.getClientRects().length);
+    const columnCount = gridColumnCount(root);
+    const rows =
+      columnCount >= 2
+        ? cells.reduce((acc, cell, index) => {
+            const rowIndex = Math.floor(index / columnCount);
+            acc[rowIndex] = acc[rowIndex] || [];
+            acc[rowIndex].push(cell);
+            return acc;
+          }, [])
+        : rowsByPosition(cells);
     const matrix = matrixFromRowElements(rows);
     return { matrix, headerRowCount: 1, sourceType: "grid" };
   }
@@ -227,7 +346,12 @@
       s = s.slice(1);
     }
     const cleaned = s.replace(/[^0-9.]/g, "");
-    if (!cleaned || !/[0-9]/.test(cleaned) || (cleaned.match(/\./g) || []).length > 1) return null;
+    if (
+      !cleaned ||
+      !/[0-9]/.test(cleaned) ||
+      (cleaned.match(/\./g) || []).length > 1
+    )
+      return null;
     const value = parseFloat(cleaned);
     if (!Number.isFinite(value)) return null;
     return negative ? -value : value;
@@ -256,7 +380,8 @@
 
     const rows = bodyMatrix.map((row) => {
       const cells = [];
-      for (let i = 0; i < width; i += 1) cells[i] = row[i] || { text: "", html: "" };
+      for (let i = 0; i < width; i += 1)
+        cells[i] = row[i] || { text: "", html: "" };
       return { cells };
     });
 
@@ -271,7 +396,7 @@
         visible: true,
         width: null,
         type,
-        align: type === "number" ? "right" : "left"
+        align: type === "number" ? "right" : "left",
       });
     }
 
@@ -280,7 +405,7 @@
       columns: columns.length,
       rows: rows.length,
       sourceType: raw.sourceType,
-      useFirstRowAsHeader
+      useFirstRowAsHeader,
     });
   }
 
@@ -295,13 +420,19 @@
     let rows = model.rows;
     const search = viewState.search.trim().toLowerCase();
     const filters = viewState.filters;
-    const filterEntries = Object.entries(filters).filter(([, value]) => value && value.trim());
+    const filterEntries = Object.entries(filters).filter(
+      ([, value]) => value && value.trim(),
+    );
 
     if (search || filterEntries.length) {
       const searchCols = visibleColumnsInOrder();
       rows = rows.filter((row) => {
         if (search) {
-          const hit = searchCols.some((col) => (row.cells[col.originalIndex]?.text || "").toLowerCase().includes(search));
+          const hit = searchCols.some((col) =>
+            (row.cells[col.originalIndex]?.text || "")
+              .toLowerCase()
+              .includes(search),
+          );
           if (!hit) return false;
         }
         for (const [colId, value] of filterEntries) {
@@ -330,7 +461,12 @@
             if (nb === null) return -1;
             return (na - nb) * factor;
           }
-          return ta.localeCompare(tb, undefined, { numeric: true, sensitivity: "base" }) * factor;
+          return (
+            ta.localeCompare(tb, undefined, {
+              numeric: true,
+              sensitivity: "base",
+            }) * factor
+          );
         });
       }
     }
@@ -401,7 +537,12 @@
     title.className = "ctm-title";
     title.textContent = "Table";
 
-    const columnsBtn = button("Columns ▾", "ctm-button ctm-columns-toggle", toggleColumnsPanel, "Show / hide columns");
+    const columnsBtn = button(
+      "Columns ▾",
+      "ctm-button ctm-columns-toggle",
+      toggleColumnsPanel,
+      "Show / hide columns",
+    );
     columnsBtn.setAttribute("aria-pressed", String(columnsPanelOpen));
     refs.columnsToggle = columnsBtn;
 
@@ -413,7 +554,7 @@
         renderToolbar();
         renderTable();
       },
-      "Toggle per-column filter row"
+      "Toggle per-column filter row",
     );
     if (viewState.filtersVisible) filterBtn.classList.add("ctm-button-active");
 
@@ -440,11 +581,36 @@
     count.className = "ctm-badge ctm-row-count";
     refs.rowCount = count;
 
-    const copyCsv = button("CSV", "ctm-button", () => copyView("csv"), "Copy current view as CSV");
-    const copyTsv = button("TSV", "ctm-button", () => copyView("tsv"), "Copy current view as TSV");
-    const copyHtml = button("HTML", "ctm-button", () => copyView("html"), "Copy current view as HTML table");
-    const reset = button("Reset", "ctm-button", resetView, "Reset sort, filters, columns");
-    const close = button("Close", "ctm-button ctm-close-button", closeModal, "Close");
+    const copyCsv = button(
+      "CSV",
+      "ctm-button",
+      () => copyView("csv"),
+      "Copy current view as CSV",
+    );
+    const copyTsv = button(
+      "TSV",
+      "ctm-button",
+      () => copyView("tsv"),
+      "Copy current view as TSV",
+    );
+    const copyHtml = button(
+      "HTML",
+      "ctm-button",
+      () => copyView("html"),
+      "Copy current view as HTML table",
+    );
+    const reset = button(
+      "Reset",
+      "ctm-button",
+      resetView,
+      "Reset sort, filters, columns",
+    );
+    const close = button(
+      "Close",
+      "ctm-button ctm-close-button",
+      closeModal,
+      "Close",
+    );
 
     right.append(count, copyCsv, copyTsv, copyHtml, reset, close);
 
@@ -459,9 +625,10 @@
     const total = model.rows.length;
     const shown = computeView().length;
     const cols = visibleColumnsInOrder().length;
-    refs.rowCount.textContent = shown === total
-      ? `${total} rows · ${cols} cols`
-      : `${shown} / ${total} rows · ${cols} cols`;
+    refs.rowCount.textContent =
+      shown === total
+        ? `${total} rows · ${cols} cols`
+        : `${shown} / ${total} rows · ${cols} cols`;
   }
 
   function toggleColumnsPanel() {
@@ -505,7 +672,10 @@
       viewState.useFirstRowAsHeader = headerCheck.checked;
       rebuildFromOptions();
     });
-    headerToggle.append(headerCheck, document.createTextNode("Use first row as header"));
+    headerToggle.append(
+      headerCheck,
+      document.createTextNode("Use first row as header"),
+    );
     header.append(heading, headerToggle);
 
     const allRow = document.createElement("div");
@@ -522,7 +692,7 @@
         renderTable();
         renderColumnsPanel();
         updateRowCount();
-      })
+      }),
     );
 
     const list = document.createElement("div");
@@ -563,7 +733,9 @@
       // Carry over the previous column order, visibility, and widths by original index.
       const reordered = [];
       for (const old of prev) {
-        const next = model.columns.find((c) => c.originalIndex === old.originalIndex);
+        const next = model.columns.find(
+          (c) => c.originalIndex === old.originalIndex,
+        );
         if (next) {
           next.visible = old.visible;
           next.width = old.width;
@@ -575,7 +747,11 @@
       }
       model.columns = reordered;
     }
-    if (viewState.sort && !model.columns.some((c) => c.id === viewState.sort.colId)) viewState.sort = null;
+    if (
+      viewState.sort &&
+      !model.columns.some((c) => c.id === viewState.sort.colId)
+    )
+      viewState.sort = null;
     renderTable();
     renderColumnsPanel();
     updateRowCount();
@@ -684,8 +860,11 @@
     });
     th.addEventListener("dragend", () => {
       th.classList.remove("ctm-th-dragging");
-      refs.table?.querySelectorAll(".ctm-th-drop-before, .ctm-th-drop-after")
-        .forEach((el) => el.classList.remove("ctm-th-drop-before", "ctm-th-drop-after"));
+      refs.table
+        ?.querySelectorAll(".ctm-th-drop-before, .ctm-th-drop-after")
+        .forEach((el) =>
+          el.classList.remove("ctm-th-drop-before", "ctm-th-drop-after"),
+        );
     });
     th.addEventListener("dragover", (e) => {
       e.preventDefault();
@@ -757,7 +936,10 @@
       const colEls = refs.colgroup.children;
       ths.forEach((th, i) => {
         const col = cols[i];
-        const measured = Math.max(80, Math.min(520, Math.round(th.getBoundingClientRect().width)));
+        const measured = Math.max(
+          80,
+          Math.min(520, Math.round(th.getBoundingClientRect().width)),
+        );
         col.width = col.width || measured;
         if (colEls[i]) colEls[i].style.width = `${col.width}px`;
       });
@@ -835,15 +1017,19 @@
     const cols = visibleColumnsInOrder();
     const rows = computeView();
     const header = cols.map((c) => c.label || c.id);
-    const body = rows.map((row) => cols.map((col) => row.cells[col.originalIndex]?.text || ""));
+    const body = rows.map((row) =>
+      cols.map((col) => row.cells[col.originalIndex]?.text || ""),
+    );
     return { header, body };
   }
 
   function toDelimited(matrix, delimiter) {
     const escape = (value) => {
       const s = String(value ?? "");
-      if (delimiter === "," && /[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-      if (delimiter === "\t") return s.replace(/\t/g, " ").replace(/\r?\n/g, " ");
+      if (delimiter === "," && /[",\n\r]/.test(s))
+        return `"${s.replace(/"/g, '""')}"`;
+      if (delimiter === "\t")
+        return s.replace(/\t/g, " ").replace(/\r?\n/g, " ");
       return s;
     };
     return [matrix.header, ...matrix.body]
@@ -861,7 +1047,10 @@
   function toHtml(matrix) {
     const head = `<tr>${matrix.header.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>`;
     const body = matrix.body
-      .map((row) => `<tr>${row.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`)
+      .map(
+        (row) =>
+          `<tr>${row.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`,
+      )
       .join("");
     return `<table border="1" cellspacing="0" cellpadding="4"><thead>${head}</thead><tbody>${body}</tbody></table>`;
   }
@@ -872,12 +1061,15 @@
       if (format === "html") {
         const html = toHtml(matrix);
         const plain = toDelimited(matrix, "\t");
-        if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
+        if (
+          navigator.clipboard?.write &&
+          typeof ClipboardItem !== "undefined"
+        ) {
           await navigator.clipboard.write([
             new ClipboardItem({
               "text/html": new Blob([html], { type: "text/html" }),
-              "text/plain": new Blob([plain], { type: "text/plain" })
-            })
+              "text/plain": new Blob([plain], { type: "text/plain" }),
+            }),
           ]);
         } else {
           await navigator.clipboard.writeText(html);
@@ -922,7 +1114,7 @@
     for (const row of matrix) {
       for (const cell of row) {
         totalCells += 1;
-        if (/<(img|svg|video|canvas|picture|iframe)\b/i.test(cell.html || "")) mediaCells += 1;
+        if (cell.hasSubstantiveMedia) mediaCells += 1;
         const text = (cell.text || "").trim();
         if (text) {
           textCells += 1;
@@ -931,9 +1123,12 @@
       }
     }
     if (!totalCells) return { ok: false, reason: "no cells found" };
-    if (mediaCells / totalCells >= 0.4) return { ok: false, reason: "looks like an image gallery" };
-    if (textCells / totalCells < 0.4) return { ok: false, reason: "too few cells contain text" };
-    if (totalTextLength < 6) return { ok: false, reason: "almost no text content" };
+    if (mediaCells / totalCells >= 0.4)
+      return { ok: false, reason: "looks like an image gallery" };
+    if (textCells / totalCells < 0.4)
+      return { ok: false, reason: "too few cells contain text" };
+    if (totalTextLength < 6)
+      return { ok: false, reason: "almost no text content" };
     return { ok: true };
   }
 
@@ -960,7 +1155,7 @@
       filters: {},
       search: "",
       filtersVisible: false,
-      useFirstRowAsHeader: raw.headerRowCount > 0
+      useFirstRowAsHeader: raw.headerRowCount > 0,
     };
     columnsPanelOpen = false;
     buildModel(viewState.useFirstRowAsHeader);
@@ -1096,7 +1291,7 @@
 
     console.info(LOG_PREFIX, `Alt-${trigger} matched table-like element`, {
       kind: found.kind,
-      tag: found.el.tagName
+      tag: found.el.tagName,
     });
 
     event.preventDefault();
@@ -1106,17 +1301,29 @@
     return true;
   }
 
-  document.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0) return;
-    handleAltActivation(event, "pointerdown");
-  }, true);
-  document.addEventListener("mousedown", (event) => {
-    if (event.button !== 0) return;
-    handleAltActivation(event, "mousedown");
-  }, true);
-  document.addEventListener("click", (event) => {
-    handleAltActivation(event, "click");
-  }, true);
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (event.button !== 0) return;
+      handleAltActivation(event, "pointerdown");
+    },
+    true,
+  );
+  document.addEventListener(
+    "mousedown",
+    (event) => {
+      if (event.button !== 0) return;
+      handleAltActivation(event, "mousedown");
+    },
+    true,
+  );
+  document.addEventListener(
+    "click",
+    (event) => {
+      handleAltActivation(event, "click");
+    },
+    true,
+  );
 
   installPageStyle();
 })();

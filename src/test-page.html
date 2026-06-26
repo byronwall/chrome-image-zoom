@@ -101,6 +101,67 @@
         background: #e7ecf7;
         font-weight: 700;
       }
+
+      .railway-dialog {
+        width: min(760px, 100%);
+        background: #fff;
+        border: 1px solid #d8deea;
+        border-radius: 12px;
+        box-shadow: 0 8px 28px rgba(20, 28, 50, 0.12);
+        padding: 24px;
+      }
+      .railway-dialog h3 {
+        margin: 0 0 18px;
+        font-size: 20px;
+      }
+      .railway-dns-wrap {
+        border: 1px solid #d8deea;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .railway-dns-grid {
+        display: grid;
+        grid-template-columns: auto minmax(12rem, 14rem) minmax(0, 1fr);
+        font-size: 13px;
+      }
+      .railway-dns-grid > div {
+        min-width: 0;
+        padding: 10px 14px;
+        border-top: 1px solid #e9edf5;
+      }
+      .railway-dns-grid > div:nth-child(-n + 3) {
+        border-top: 0;
+        background: #f7f9fc;
+        color: #5b6680;
+        font-size: 12px;
+      }
+      .railway-cell-inner {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 8px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+      .railway-copy-cell {
+        cursor: pointer;
+        user-select: none;
+      }
+      .railway-copy-cell .railway-cell-inner {
+        justify-content: space-between;
+      }
+      .railway-copy-cell span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .railway-icon {
+        color: #15a46b;
+        flex: none;
+      }
+      .railway-copy-icon {
+        color: #8b95aa;
+        flex: none;
+      }
     </style>
   </head>
   <body>

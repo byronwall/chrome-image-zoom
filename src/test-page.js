@@ -10,11 +10,53 @@
     "pariatur excepteur sint occaecat cupidatat non proident sunt culpa officia"
   ).split(" ");
 
-  const FIRST = ["Ada", "Grace", "Alan", "Katherine", "Dennis", "Margaret", "Linus", "Barbara", "Ken", "Radia", "Tim", "Hedy"];
-  const LAST = ["Lovelace", "Hopper", "Turing", "Johnson", "Ritchie", "Hamilton", "Torvalds", "Liskov", "Thompson", "Perlman", "Berners-Lee", "Lamarr"];
-  const REGIONS = ["North America", "South America", "EMEA", "APAC", "Central Europe", "Oceania"];
+  const FIRST = [
+    "Ada",
+    "Grace",
+    "Alan",
+    "Katherine",
+    "Dennis",
+    "Margaret",
+    "Linus",
+    "Barbara",
+    "Ken",
+    "Radia",
+    "Tim",
+    "Hedy",
+  ];
+  const LAST = [
+    "Lovelace",
+    "Hopper",
+    "Turing",
+    "Johnson",
+    "Ritchie",
+    "Hamilton",
+    "Torvalds",
+    "Liskov",
+    "Thompson",
+    "Perlman",
+    "Berners-Lee",
+    "Lamarr",
+  ];
+  const REGIONS = [
+    "North America",
+    "South America",
+    "EMEA",
+    "APAC",
+    "Central Europe",
+    "Oceania",
+  ];
   const STATUS = ["active", "pending", "blocked", "done", "archived"];
-  const PRODUCTS = ["Widget", "Gadget", "Sprocket", "Cog", "Flywheel", "Piston", "Lever", "Valve"];
+  const PRODUCTS = [
+    "Widget",
+    "Gadget",
+    "Sprocket",
+    "Cog",
+    "Flywheel",
+    "Piston",
+    "Lever",
+    "Valve",
+  ];
 
   let seed = 1337;
   function rand() {
@@ -35,7 +77,9 @@
     const node = document.createElement(tag);
     Object.assign(node, props);
     for (const child of [].concat(children)) {
-      node.append(child instanceof Node ? child : document.createTextNode(String(child)));
+      node.append(
+        child instanceof Node ? child : document.createTextNode(String(child)),
+      );
     }
     return node;
   }
@@ -65,12 +109,12 @@
     const svgs = [
       { label: "SVG · teal", bg: "#dff3ee", fg: "#0f9b8e" },
       { label: "SVG · amber", bg: "#fdf0db", fg: "#d98324" },
-      { label: "SVG · indigo", bg: "#e7e9fb", fg: "#4f46e5" }
+      { label: "SVG · indigo", bg: "#e7e9fb", fg: "#4f46e5" },
     ];
     for (const s of svgs) {
       const fig = el("figure", {}, [
         el("img", { src: svgImage(s.label, s.bg, s.fg), alt: s.label }),
-        el("figcaption", {}, `${s.label} (inline data URI)`)
+        el("figcaption", {}, `${s.label} (inline data URI)`),
       ]);
       grid.append(fig);
     }
@@ -80,8 +124,13 @@
       const seedName = `altzoom-${i}`;
       const src = `https://picsum.photos/seed/${seedName}/600/400`;
       const fig = el("figure", {}, [
-        el("img", { src, alt: `Placeholder photo ${i + 1}`, loading: "lazy", referrerPolicy: "no-referrer" }),
-        el("figcaption", {}, `picsum.photos · seed ${seedName}`)
+        el("img", {
+          src,
+          alt: `Placeholder photo ${i + 1}`,
+          loading: "lazy",
+          referrerPolicy: "no-referrer",
+        }),
+        el("figcaption", {}, `picsum.photos · seed ${seedName}`),
       ]);
       grid.append(fig);
     }
@@ -119,7 +168,7 @@
         `PRJ-${1000 + i}`,
         `${pick(FIRST)} ${pick(LAST)}`,
         pick(STATUS),
-        words(intBetween(2, 22))
+        words(intBetween(2, 22)),
       ]);
     }
     root.append(buildTable(rows));
@@ -135,7 +184,13 @@
     for (let i = 0; i < 9; i += 1) {
       const units = intBetween(50, 4000);
       const price = intBetween(8, 90);
-      grid.append(el("div", {}, `${pick(PRODUCTS)} ${pick(["A", "B", "C", "X", "Pro", "Mini"])}`));
+      grid.append(
+        el(
+          "div",
+          {},
+          `${pick(PRODUCTS)} ${pick(["A", "B", "C", "X", "Pro", "Mini"])}`,
+        ),
+      );
       grid.append(el("div", {}, pick(REGIONS)));
       grid.append(el("div", {}, units.toLocaleString()));
       grid.append(el("div", {}, `$${(units * price).toLocaleString()}`));
@@ -143,9 +198,123 @@
     root.append(grid);
   }
 
-  // 3) Numeric-heavy table for sort/filter testing.
+  // 3) Railway-style DNS modal: flat CSS grid with nested copy controls.
+  function buildRailwayDnsDialog() {
+    heading("3 · Railway DNS records dialog", "nested CSS grid");
+    const dialog = el("div", {
+      className: "railway-dialog",
+      role: "dialog",
+      tabIndex: -1,
+      ariaLabel: "Configure DNS Records",
+    });
+    dialog.append(el("h3", {}, "Configure DNS Records"));
+
+    const wrap = el("div", { className: "railway-dns-wrap" });
+    const grid = el("div", { className: "railway-dns-grid" });
+    grid.append(
+      el("div", {}, "Type"),
+      el("div", {}, "Name"),
+      el("div", {}, "Value"),
+    );
+
+    const records = [
+      ["CNAME", "demo-site.app", "z9k4m2px.up.railway.app"],
+      [
+        "TXT",
+        "_railway-verify.demo-site.app",
+        "railway-verify=4b7d9a1f6c2e8d0b5a3c7f91e4d6b8c2a0f5e3d9c1b7a6f4e2d8c0a9b5f3e1d7",
+      ],
+    ];
+
+    for (const record of records) {
+      grid.append(
+        typeCell(record[0]),
+        copyCell(record[1]),
+        copyCell(record[2]),
+      );
+    }
+    wrap.append(grid);
+    dialog.append(wrap);
+    root.append(dialog);
+  }
+
+  function typeCell(text) {
+    return el("div", {}, [
+      el("div", { className: "railway-cell-inner" }, [
+        railwayIcon("check"),
+        text,
+      ]),
+    ]);
+  }
+
+  function copyCell(text) {
+    return el(
+      "div",
+      { className: "railway-copy-cell", title: "Click to copy" },
+      [
+        el("div", { className: "railway-cell-inner" }, [
+          el("span", {}, text),
+          railwayIcon("copy"),
+        ]),
+      ],
+    );
+  }
+
+  function railwayIcon(kind) {
+    const wrap = el("span", {
+      className: kind === "check" ? "railway-icon" : "railway-copy-icon",
+      ariaHidden: "true",
+    });
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    svg.setAttribute("width", "1em");
+    svg.setAttribute("height", "1em");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute(
+      "class",
+      kind === "check"
+        ? "feather feather-check-circle"
+        : "feather feather-copy",
+    );
+
+    if (kind === "check") {
+      svg.append(svgPath("M22 11.08V12a10 10 0 1 1-5.93-9.14"));
+      svg.append(svgPath("M22 4 12 14.01l-3-3"));
+    } else {
+      const rect = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "rect",
+      );
+      rect.setAttribute("x", "9");
+      rect.setAttribute("y", "9");
+      rect.setAttribute("width", "13");
+      rect.setAttribute("height", "13");
+      rect.setAttribute("rx", "2");
+      rect.setAttribute("ry", "2");
+      svg.append(
+        rect,
+        svgPath("M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"),
+      );
+    }
+
+    wrap.append(svg);
+    return wrap;
+  }
+
+  function svgPath(d) {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    return path;
+  }
+
+  // 4) Numeric-heavy table for sort/filter testing.
   function buildNumericTable() {
-    heading("3 · Sales by region (numbers for sorting)", "<table>");
+    heading("4 · Sales by region (numbers for sorting)", "<table>");
     const rows = [["Rep", "Region", "Deals", "Quota %", "Revenue"]];
     for (let i = 0; i < 16; i += 1) {
       const deals = intBetween(3, 120);
@@ -156,27 +325,37 @@
         pick(REGIONS),
         String(deals),
         `${quota}%`,
-        `$${revenue.toLocaleString()}`
+        `$${revenue.toLocaleString()}`,
       ]);
     }
     root.append(buildTable(rows, { num: [2, 3, 4] }));
   }
 
-  // 4) Very long table to stress row count / scrolling / copy.
+  // 5) Very long table to stress row count / scrolling / copy.
   function buildLongTable(rowCount) {
-    heading(`4 · Event log (${rowCount.toLocaleString()} rows)`, "long <table>");
+    heading(
+      `5 · Event log (${rowCount.toLocaleString()} rows)`,
+      "long <table>",
+    );
     const box = el("div", { className: "scroll-box" });
-    const rows = [["#", "Timestamp", "Level", "User", "Message", "Duration (ms)"]];
+    const rows = [
+      ["#", "Timestamp", "Level", "User", "Message", "Duration (ms)"],
+    ];
     const baseTime = Date.UTC(2026, 0, 1, 0, 0, 0);
     for (let i = 0; i < rowCount; i += 1) {
-      const ts = new Date(baseTime + i * 37000).toISOString().replace("T", " ").slice(0, 19);
+      const ts = new Date(baseTime + i * 37000)
+        .toISOString()
+        .replace("T", " ")
+        .slice(0, 19);
       rows.push([
         String(i + 1),
         ts,
         pick(["INFO", "WARN", "ERROR", "DEBUG", "TRACE"]),
-        `${pick(FIRST).toLowerCase()}.${pick(LAST).toLowerCase().replace(/[^a-z]/g, "")}`,
+        `${pick(FIRST).toLowerCase()}.${pick(LAST)
+          .toLowerCase()
+          .replace(/[^a-z]/g, "")}`,
         words(intBetween(3, 12)),
-        String(intBetween(1, 9000))
+        String(intBetween(1, 9000)),
       ]);
     }
     box.append(buildTable(rows, { num: [0, 5] }));
@@ -187,6 +366,7 @@
   buildImages();
   buildProjectsTable();
   buildGridTable();
+  buildRailwayDnsDialog();
   buildNumericTable();
   buildLongTable(3000);
 })();
