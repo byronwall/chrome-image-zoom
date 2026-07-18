@@ -7,6 +7,12 @@ Unpacked Chrome extension that turns **Alt-click** into a universal inspector:
 
 The two overlays are completely independent code paths — they never mix — and a set of heuristics decides which one a given Alt-click should open.
 
+## Project notes
+
+- [Alt Zoom project page](https://byroni.us/projects/chrome-image-modal)
+- [Why I made a pan-and-zoom viewer for webpage images](https://byroni.us/blog/chatgpt-image-pan-zoom)
+- [Expanding webpage tables when copy is the real feature](https://byroni.us/blog/expanding-web-tables-for-copying)
+
 ## Screenshots
 
 ### Table Viewer
